@@ -44,7 +44,7 @@ bool Camera::init() {
         .ledc_timer = LEDC_TIMER_0,
         .ledc_channel = LEDC_CHANNEL_0,
         .pixel_format = PIXFORMAT_JPEG,
-        .frame_size = FRAMESIZE_240X240,
+        .frame_size = FRAMESIZE_QVGA,
         .jpeg_quality = 12,
         .fb_count = 1,
         .fb_location = CAMERA_FB_IN_PSRAM,
@@ -60,6 +60,12 @@ bool Camera::init() {
     sensor_t *s = esp_camera_sensor_get();
     if (s != NULL) {
         s->set_vflip(s, 1);
+    }
+
+    camera_mutex = xSemaphoreCreateMutex();
+    if (camera_mutex == NULL) {
+        ESP_LOGE("CAM", "Failed to create camera mutex");
+        return false;
     }
 
     camera_initialized = true;
@@ -97,14 +103,14 @@ char Camera::recognize_digit() {
     signal.total_length = DIGIT_W * DIGIT_H;
     signal.get_data = &ei_camera_get_data;
 
-    char best_digit = '?';
+    char best_digit = DIGIT_EMPTY;
 
     ei_impulse_result_t result = {0};
     EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
 
     if (res != EI_IMPULSE_OK) {
         ESP_LOGI(TAG, "ERR: run_classifier (%d)\n", res);
-        return '?';
+        return DIGIT_EMPTY;
     }
 
     float best_score = THRESHOLD_VAL;
@@ -117,11 +123,11 @@ char Camera::recognize_digit() {
         }
     }
 
-    if (best_digit != '?') {
+    /*if (best_digit != DIGIT_EMPTY) {
         ESP_LOGI(TAG, " -> %c (%.2f)\n", best_digit, best_score);
     } else {
         ESP_LOGI(TAG, " -> not detected");
-    }
+    }*/
 
     return best_digit;
 }
@@ -135,17 +141,16 @@ bool Camera::take_photo_and_process() {
         return false;
     }
 
-    char result_str[6] = "?????";
-    
     extract_roi(fb);
-    
-    for(int i = 0; i < 5; i++) {
+
+    for(int i = 0; i < DIGIT_NUM; i++) {
         extract_digit(i);
-        result_str[i] = recognize_digit();
+        digits[i] = recognize_digit();
     }
 
-    result_str[5] = '\0';
-    ESP_LOGI(TAG, "WATER METER READING: [%s]", result_str);
+    digits[DIGIT_NUM] = '\0';
+
+    ESP_LOGI(TAG, "WATER METER READING: [%s]", digits);
 
     esp_camera_fb_return(fb);
     image_count++;
@@ -170,7 +175,7 @@ void Camera::extract_digit(const int item) {
         sd_card.save_as_jpeg(digit_buf, DIGIT_W, DIGIT_H, name, 80);
     }
 
-    ESP_LOGI(TAG, "Digit %d: ", item);
+    //ESP_LOGI(TAG, "Digit %d: ", item);
 }
 
 void Camera::extract_roi(camera_fb_t* fb) {
@@ -212,4 +217,27 @@ void Camera::extract_roi(camera_fb_t* fb) {
     }
 
     free(rgb888_buf);
+}
+
+camera_fb_t* Camera::get_frame_for_download() {
+    if (xSemaphoreTake(camera_mutex, pdMS_TO_TICKS(5000)) != pdTRUE) {
+        ESP_LOGW("CAM", "Timeout waiting for camera in download handler");
+        return nullptr;
+    }
+
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
+        ESP_LOGE("CAM", "Capture failed in download handler");
+        xSemaphoreGive(camera_mutex);
+        return nullptr;
+    }
+
+    return fb;
+}
+
+void Camera::return_frame(camera_fb_t* fb) {
+    if (fb) {
+        esp_camera_fb_return(fb);
+    }
+    xSemaphoreGive(camera_mutex);
 }

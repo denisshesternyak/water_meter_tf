@@ -15,8 +15,19 @@ idf_component_register(
         "main.cpp" 
         "cam/camera.cpp" 
         "sd/sd_card.cpp"
+        "server/server.cpp"
     INCLUDE_DIRS 
         "."
         "cam"
         "sd"
+        "server"
+    PRIV_REQUIRES
+        esp_wifi 
+        esp_http_server
+        esp_timer
+        nvs_flash
+        fatfs
+    REQUIRES 
+        esp32-camera 
+        edge-impulse
 )

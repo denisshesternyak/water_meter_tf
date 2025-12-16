@@ -1,20 +1,30 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_SSID     "Xiaomi_DD71"
-#define CONFIG_PASSWORD "95078191"
+#include "model_metadata.h"
+
+#define STRINGIFY(x) #x
+#define STRINGIFY_VALUE(x) STRINGIFY(x)
+
+#define UPDATE_MS       3000
+
+#define ESP_WIFI_SSID   "Xiaomi_DD71"
+#define ESP_WIFI_PASS   "95078191"
+
+#define DIGIT_NUM       5
+#define DIGIT_EMPTY     '-'
 
 // Edge Impulse config
-#define ROI_X           0
-#define ROI_Y           100
+#define ROI_X           40
+#define ROI_Y           115
 #define ROI_W           240
 #define ROI_H           48
-#define ROI_SIZE        (ROI_W * ROI_H * 3)
-#define DIGIT_W         48//EI_CLASSIFIER_INPUT_WIDTH
-#define DIGIT_H         48//EI_CLASSIFIER_INPUT_HEIGHT
+#define ROI_SIZE        (ROI_W * ROI_H)
+#define ROI_SIZE_RGB    (ROI_SIZE * 3)
+#define DIGIT_W         EI_CLASSIFIER_INPUT_WIDTH
+#define DIGIT_H         EI_CLASSIFIER_INPUT_HEIGHT
 #define DIGIT_SIZE      (DIGIT_W * DIGIT_H * 3)
 #define THRESHOLD_VAL   0.6f
-
 
 #define IMAGES_DIR      "/sdcard/images"
 #define ROI_PATH        "/images/roi_%d.jpg"
